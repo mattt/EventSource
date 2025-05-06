@@ -32,7 +32,7 @@ public enum EventSourceError: Swift.Error, LocalizedError {
 /// (open upon initialization, auto-reconnect, close behavior).
 public actor EventSource {
     /// The ready state of the EventSource.
-    public enum ReadyState: Int {
+    public enum ReadyState: Int, Codable, Sendable, CustomStringConvertible {
         /// The connection is being established.
         case connecting = 0
 
@@ -41,6 +41,14 @@ public actor EventSource {
 
         /// The connection is closed.
         case closed = 2
+
+        public var description: String {
+            switch self {
+            case .connecting: return "connecting"
+            case .open: return "open"
+            case .closed: return "closed"
+            }
+        }
     }
 
     /// Represents a single Server-Sent Event, containing its id, event name, data, and optional retry interval.
