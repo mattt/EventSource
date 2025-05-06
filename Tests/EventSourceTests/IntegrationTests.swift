@@ -1,7 +1,6 @@
+import EventSource
 import Foundation
 import Testing
-
-@testable import EventSource
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking

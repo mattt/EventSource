@@ -1,7 +1,6 @@
+import EventSource
 import Foundation
 import Testing
-
-@testable import EventSource
 
 @Suite("AsyncEventsSequence Tests", .timeLimit(.minutes(1)))
 struct AsyncEventsSequenceTests {
@@ -273,7 +272,7 @@ struct AsyncEventsSequenceTests {
         for try await event in byteSequence.events {
             events.append(event)
         }
-        
+
         // Verify we got all three events
         #expect(events.count == 3)
         #expect(events[0].data == "event1")
