@@ -249,6 +249,7 @@ struct ParserTests {
 
         @Test("Unicode in data")
         func testUnicodeInData() async {
+            // Adapted from https://github.com/launchdarkly/swift-eventsource/blob/193c097f324666691f71b49b1e70249ef21f9f62/Tests/UTF8LineParserTests.swift#L59
             let unicodeData = "¯\\_(ツ)_/¯0️⃣🇺🇸Z̮̞̠͙͔ͅḀ̗̞͈̻̗Ḷ͙͎̯̹̞͓G̻O̭̗̮𝓯𝓸𝔁✅"
             let stream = "data: \(unicodeData)\n\n"
             let events = await getEvents(from: stream)
@@ -457,7 +458,8 @@ struct ParserTests {
 
 // Helper to consume a string and get all dispatched events
 private func getEvents(
-    from input: String, parser: EventSource.Parser = EventSource.Parser()
+    from input: String,
+    parser: EventSource.Parser = EventSource.Parser()
 )
     async -> [EventSource.Event]
 {
@@ -465,7 +467,6 @@ private func getEvents(
         await parser.consume(byte)
     }
     // Call finish to process any buffered line and dispatch pending event based on current parser logic.
-    // Note: Spec interpretation for final unterminated lines is discussed in test_finalLineUnterminatedIsProcessedByFinish.
     await parser.finish()
     var events: [EventSource.Event] = []
     while let event = await parser.getNextEvent() {
