@@ -10,14 +10,14 @@ import Foundation
 /// (open upon initialization, auto-reconnect, close behavior).
 public actor EventSource {
     /// Errors that can occur when using `EventSource`.
-    public enum Error: Swift.Error, CustomStringConvertible {
+    public enum Error: Swift.Error, LocalizedError {
         /// The HTTP response status code is not 200.
         case invalidHTTPStatus(Int)
 
         /// The Content-Type header is not `text/event-stream`.
         case invalidContentType(String?)
 
-        public var description: String {
+        public var errorDescription: String {
             switch self {
             case .invalidHTTPStatus(let code):
                 return "Invalid HTTP response status code: \(code)"
