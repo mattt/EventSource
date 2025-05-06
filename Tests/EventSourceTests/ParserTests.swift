@@ -1,6 +1,5 @@
+import EventSource
 import Testing
-
-@testable import EventSource
 
 @Suite("EventSource Parser Tests", .timeLimit(.minutes(1)))
 struct ParserTests {

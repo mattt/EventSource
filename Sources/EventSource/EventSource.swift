@@ -88,6 +88,9 @@ public actor EventSource {
         /// Track whether "data:" field was seen in the current event
         private var seenFields: Set<String> = []
 
+        /// Creates a new parser.
+        public init() {}
+
         private func fieldSeen(_ field: String) -> Bool {
             return seenFields.contains(field)
         }
@@ -217,22 +220,22 @@ public actor EventSource {
         }
 
         /// Get the next event from the queue
-        func getNextEvent() -> Event? {
+        public func getNextEvent() -> Event? {
             return eventQueue.isEmpty ? nil : eventQueue.removeFirst()
         }
 
         /// Get the last event ID (for reconnection)
-        func getLastEventId() -> String {
+        public func getLastEventId() -> String {
             return lastEventId
         }
 
         /// Get the reconnection time in milliseconds
-        func getReconnectionTime() -> Int {
+        public func getReconnectionTime() -> Int {
             return reconnectionTime
         }
 
         /// Complete parsing, handling any pending bytes
-        func finish() {
+        public func finish() {
             if sawCR {
                 let line = processLineBuffer()
                 handleLine(line)
