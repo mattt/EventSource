@@ -111,8 +111,8 @@ public actor EventSource {
         /// Convert the line buffer to a string and clear it
         private func processLineBuffer() -> String {
             // Skip UTF-8 BOM if present at the start of the buffer
-            if lineBuffer.count >= 3 && lineBuffer[0] == 0xEF && lineBuffer[1] == 0xBB
-                && lineBuffer[2] == 0xBF
+            if lineBuffer.count >= 3,
+                lineBuffer.prefix(3) == [0xEF, 0xBB, 0xBF]
             {
                 lineBuffer.removeFirst(3)
             }
