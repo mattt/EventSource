@@ -45,13 +45,13 @@ import Testing
 
         /// Actor to manage state in a thread-safe way
         actor ErrorTracker {
-            private var error: EventSource.Error?
+            private var error: EventSourceError?
 
-            func setError(_ newError: EventSource.Error?) {
+            func setError(_ newError: EventSourceError?) {
                 error = newError
             }
 
-            func getError() -> EventSource.Error? {
+            func getError() -> EventSourceError? {
                 return error
             }
         }
@@ -713,7 +713,7 @@ import Testing
                 // Set up error handler
                 let errorTracker = ErrorTracker()
                 eventSource.onError = { error in
-                    if let specificError = error as? EventSource.Error {
+                    if let specificError = error as? EventSourceError {
                         Task {
                             await errorTracker.setError(specificError)
                         }

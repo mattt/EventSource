@@ -4,33 +4,33 @@ import Foundation
     import FoundationNetworking
 #endif
 
+/// Errors that can occur when using `EventSource`.
+public enum EventSourceError: Swift.Error, LocalizedError {
+    /// The HTTP response status code is not 200.
+    case invalidHTTPStatus(Int)
+
+    /// The Content-Type header is not `text/event-stream`.
+    case invalidContentType(String?)
+
+    public var errorDescription: String {
+        switch self {
+        case .invalidHTTPStatus(let code):
+            return "Invalid HTTP response status code: \(code)"
+        case .invalidContentType(let contentType):
+            if let ct = contentType {
+                return "Invalid Content-Type for SSE: \(ct)"
+            } else {
+                return "Missing Content-Type header in SSE response"
+            }
+        }
+    }
+}
+
 /// `EventSource` manages a Server-Sent Events (SSE) connection.
 ///
 /// This implementation mirrors the API of JavaScript's EventSource
 /// (open upon initialization, auto-reconnect, close behavior).
 public actor EventSource {
-    /// Errors that can occur when using `EventSource`.
-    public enum Error: Swift.Error, LocalizedError {
-        /// The HTTP response status code is not 200.
-        case invalidHTTPStatus(Int)
-
-        /// The Content-Type header is not `text/event-stream`.
-        case invalidContentType(String?)
-
-        public var errorDescription: String {
-            switch self {
-            case .invalidHTTPStatus(let code):
-                return "Invalid HTTP response status code: \(code)"
-            case .invalidContentType(let contentType):
-                if let ct = contentType {
-                    return "Invalid Content-Type for SSE: \(ct)"
-                } else {
-                    return "Missing Content-Type header in SSE response"
-                }
-            }
-        }
-    }
-
     /// The ready state of the EventSource.
     public enum ReadyState: Int {
         /// The connection is being established.
@@ -392,16 +392,16 @@ public actor EventSource {
                     let status = httpResponse.statusCode
                     if status != 200 {
                         // HTTP status not OK -> do not reconnect (per spec, fail the connection).
-                        throw EventSource.Error.invalidHTTPStatus(status)
+                        throw EventSourceError.invalidHTTPStatus(status)
                     }
                     // Check Content-Type header
                     let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")
                     if contentType?.lowercased().hasPrefix("text/event-stream") != true {
-                        throw EventSource.Error.invalidContentType(contentType)
+                        throw EventSourceError.invalidContentType(contentType)
                     }
                 } else {
                     // Non-HTTP response (unlikely for URLSession) -> treat as error.
-                    throw EventSource.Error.invalidHTTPStatus(0)
+                    throw EventSourceError.invalidHTTPStatus(0)
                 }
 
                 // Connection is established and content type is correct.
@@ -455,7 +455,7 @@ public actor EventSource {
                 }
 
                 // For HTTP status/content-type errors, break out (do not reconnect as per spec).
-                if error is EventSource.Error {
+                if error is EventSourceError {
                     readyState = .closed
                     break
                 }
