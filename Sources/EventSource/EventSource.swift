@@ -110,7 +110,15 @@ public actor EventSource {
 
         /// Convert the line buffer to a string and clear it
         private func processLineBuffer() -> String {
-            let line = String(bytes: lineBuffer, encoding: .utf8) ?? ""
+            // Skip UTF-8 BOM if present at the start of the buffer
+            if lineBuffer.count >= 3 && lineBuffer[0] == 0xEF && lineBuffer[1] == 0xBB
+                && lineBuffer[2] == 0xBF
+            {
+                lineBuffer.removeFirst(3)
+            }
+
+            // Use String(decoding:as:) to handle invalid UTF-8 sequences by replacing them with replacement character
+            let line = String(decoding: lineBuffer, as: UTF8.self)
             lineBuffer.removeAll(keepingCapacity: true)
             return line
         }
