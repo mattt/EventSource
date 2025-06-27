@@ -23,7 +23,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/loopwork-ai/EventSource.git", from: "1.1.1")
+    .package(url: "https://github.com/loopwork/EventSource.git", from: "1.1.1")
 ]
 ```
 
@@ -31,9 +31,9 @@ dependencies: [
 
 ### Connecting to an EventSource
 
-Create an `EventSource` with a URL to establish 
-a persistent connection to an SSE endpoint. 
-The API mirrors the JavaScript [EventSource interface][mdn] 
+Create an `EventSource` with a URL to establish
+a persistent connection to an SSE endpoint.
+The API mirrors the JavaScript [EventSource interface][mdn]
 with event handlers for connection lifecycle management.
 
 ```swift
@@ -71,9 +71,9 @@ Task {
 
 ### Processing an AsyncSequence of Server-Sent Events
 
-Alternatively, you can process server-sent event data with 
+Alternatively, you can process server-sent event data with
 Swift's modern `AsyncSequence` API for greater flexibility and control.
-Use this approach when you need custom request configuration 
+Use this approach when you need custom request configuration
 or direct integration with existing async / URL Loading System code.
 
 ```swift
@@ -87,7 +87,7 @@ Task {
 
     do {
         let (stream, _) = try await URLSession.shared.bytes(for: request)
-        
+
         // Iterate through events as they arrive
         for try await event in stream.events {
             switch event.event {
@@ -107,8 +107,8 @@ Task {
 
 ### Parsing Server-Sent Events Directly
 
-Use the low-level parser directly to process raw SSE data. 
-This approach is ideal for custom networking stacks, testing, 
+Use the low-level parser directly to process raw SSE data.
+This approach is ideal for custom networking stacks, testing,
 or scenarios where you need precise control over state management.
 
 ```swift
@@ -123,9 +123,9 @@ let rawData = """
     id: 123
     event: update
     data: {"key": "value"}
-    
+
     data: Another message
-    
+
     """.utf8
 
 // Parse the data
@@ -133,12 +133,12 @@ Task {
     // Feed bytes to the parser
     for byte in rawData { await parser.consume(byte) }
     await parser.finish()
-    
+
     // Extract all parsed events
     while let event = await parser.getNextEvent() {
         handleEvent(event)
     }
-    
+
     // Access state for reconnection logic
     print("Last Event ID: \(await parser.getLastEventId())")
     print("Reconnection time: \(await parser.getReconnectionTime())ms")
@@ -179,30 +179,30 @@ Task {
     do {
         // Get a byte stream from URLSession
         let (byteStream, response) = try await URLSession.shared.bytes(for: request)
-        
+
         // Ensure response is valid
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200,
             let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type"),
-            contentType.contains("text/event-stream") 
+            contentType.contains("text/event-stream")
         else {
-            throw NSError(domain: NSURLErrorDomain, 
+            throw NSError(domain: NSURLErrorDomain,
                         code: NSURLErrorBadServerResponse,
                         userInfo: nil)
         }
-        
+
         let decoder = JSONDecoder()
 
         // Stream events asynchronously
         for try await event in byteStream.events {
             // Decode each chunk as it arrives
-            let chunk = try decoder.decode(TokenChunk.self, 
+            let chunk = try decoder.decode(TokenChunk.self,
                                            from: Data(event.data.utf8))
-            
+
             // Add the new token to our result
             completedText += chunk.text
             print("Text so far: \(completedText)")
-            
+
             // Check if the response is complete
             if chunk.isComplete {
                 print("Final response: \(completedText)")
