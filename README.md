@@ -23,7 +23,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/loopwork/EventSource.git", from: "1.1.1")
+    .package(url: "https://github.com/mattt/EventSource.git", from: "1.1.1")
 ]
 ```
 
