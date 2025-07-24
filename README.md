@@ -23,7 +23,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/loopwork/EventSource.git", from: "1.1.1")
+    .package(url: "https://github.com/mattt/EventSource.git", from: "1.1.1")
 ]
 ```
 
@@ -217,7 +217,8 @@ Task {
 
 ## License
 
-This project is licensed under the Apache License, Version 2.0.
+This project is available under the MIT license.
+See the LICENSE file for more info.
 
 [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/EventSource
 [spec]: https://html.spec.whatwg.org/multipage/server-sent-events.html#the-eventsource-interface
