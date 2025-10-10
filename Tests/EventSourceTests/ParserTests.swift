@@ -83,7 +83,8 @@ struct ParserTests {
             // Check that lastEventId was not updated with the NUL-containing ID
             #expect(
                 await parser.getLastEventId() == "",
-                "LastEventId should not be set to a value containing NUL.")
+                "LastEventId should not be set to a value containing NUL."
+            )
 
             // Check the dispatched event
             var dispatchedEvents: [EventSource.Event] = []
@@ -94,7 +95,8 @@ struct ParserTests {
             #expect(dispatchedEvents.count == 1)
             #expect(
                 dispatchedEvents.first?.id == nil,
-                "Event's ID field should be nil because the raw ID field contained NUL.")
+                "Event's ID field should be nil because the raw ID field contained NUL."
+            )
             #expect(dispatchedEvents.first?.data == "test")
         }
 
@@ -120,11 +122,13 @@ struct ParserTests {
             // After "id: " line, lastEventId should be reset to empty string
             #expect(
                 await parser.getLastEventId() == "",
-                "lastEventID should be reset to empty string by an 'id:' line.")
+                "lastEventID should be reset to empty string by an 'id:' line."
+            )
 
             #expect(
                 events[1].id == "",  // Changed from nil to empty string
-                "Second event's currentEventId should be empty string as 'id:' resets it.")
+                "Second event's currentEventId should be empty string as 'id:' resets it."
+            )
             #expect(events[1].data == "event2")
         }
 
@@ -157,7 +161,8 @@ struct ParserTests {
             #expect(events.first?.data == "test data")
             #expect(
                 events.first?.retry == 5000,
-                "The retry value should be part of the event if dispatched with it.")
+                "The retry value should be part of the event if dispatched with it."
+            )
         }
 
         @Test("Retry field only updates reconnection time")
@@ -170,7 +175,8 @@ struct ParserTests {
 
             #expect(
                 events.isEmpty,
-                "A message containing only a 'retry' field should not produce an event.")
+                "A message containing only a 'retry' field should not produce an event."
+            )
             #expect(await parser.getReconnectionTime() == 1234)
             #expect(initialReconnectionTime != 1234)
         }
@@ -294,7 +300,8 @@ struct ParserTests {
             #expect(events.count == 1)
             #expect(
                 events.first?.data == "test\u{FFFD}string",
-                "Invalid UTF-8 byte should be replaced by replacement character.")
+                "Invalid UTF-8 byte should be replaced by replacement character."
+            )
         }
 
         @Test("Field without colon is ignored")
@@ -387,13 +394,16 @@ struct ParserTests {
             #expect(events.first?.event == "", "Event type from 'event' line without value.")
             #expect(
                 events.first?.id == "",  // Changed from nil to empty string
-                "currentEventId should be empty string as 'id' line had no value.")
+                "currentEventId should be empty string as 'id' line had no value."
+            )
             #expect(
                 await parser.getLastEventId() == "",
-                "LastEventId should be empty string from 'id' line without value.")
+                "LastEventId should be empty string from 'id' line without value."
+            )
             #expect(
                 await parser.getReconnectionTime() == initialReconnectTime,
-                "Empty 'retry' field should not change reconnection time.")
+                "Empty 'retry' field should not change reconnection time."
+            )
         }
     }
 
@@ -463,7 +473,9 @@ struct ParserTests {
             let stream = "data: final event"  // No trailing newline or blank line
             let events = await getEvents(from: stream)
             #expect(
-                events.count == 1, "Event should be dispatched based on current finish() logic.")
+                events.count == 1,
+                "Event should be dispatched based on current finish() logic."
+            )
             #expect(events.first?.data == "final event")
 
             let streamWithID = "id: lastid\ndata: final event with id"
@@ -526,7 +538,8 @@ struct ParserTests {
             fullStreamBytes.append(
                 contentsOf: createSSEMessage(fields: [
                     (name: "data", value: "test with bom")
-                ]))
+                ])
+            )
 
             let parser = EventSource.Parser()
             // Process each byte individually

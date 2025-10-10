@@ -86,7 +86,8 @@ final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     /// A test trait to set up and clean up mock URL protocol handlers
     struct MockURLSessionTestTrait: TestTrait, TestScoping {
         func provideScope(
-            for test: Test, testCase: Test.Case?,
+            for test: Test,
+            testCase: Test.Case?,
             performing function: @Sendable () async throws -> Void
         ) async throws {
             // Clear handler before test
