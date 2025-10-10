@@ -6,32 +6,32 @@ on:
   pull_request:
     branches: ["main"]
 
-permissions:
-  contents: read
-  pull-requests: write
-
 jobs:
   test:
+    name: Swift ${{ matrix.swift }} on Xcode ${{ matrix.xcode }}
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 5
+    env:
+      DEVELOPER_DIR: "/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer"
     strategy:
+      fail-fast: false
       matrix:
-        swift-version:
-          - 6.0.3
-          - 6.1.0
-
-    runs-on: macos-latest
-    name: Test (Swift ${{ matrix.swift-version }})
+        include:
+          - swift: "6.0"
+            xcode: "16.0"
+            runs-on: macos-15
+          - swift: "6.1"
+            xcode: "16.3"
+            runs-on: macos-15
+          - swift: "6.2"
+            xcode: "26.0"
+            runs-on: macos-26
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Swift on macOS
-        uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: ${{ matrix.swift-version }}
-
       - name: Build
         run: swift build -v
 
-      - name: Run tests
+      - name: Test
         run: swift test -v
