@@ -7,7 +7,6 @@ import Testing
 #endif
 
 #if swift(>=6.1)
-
     /// Tests focused on real-world integration patterns for EventSource
     @Suite("Integration Examples", .serialized)
     struct IntegrationTests {
@@ -232,6 +231,10 @@ import Testing
 
         @Test("Use EventSource for token streaming", .mockURLSession)
         func testEventSourceForTokenStreaming() async throws {
+            let testTimeout: Duration = .seconds(5)
+            let expectedText = "Hello there!"
+            let expectedEventCount = 3
+
             // Define the test URL
             let url = URL(string: "https://api.example.com/completions")!
 
@@ -270,12 +273,12 @@ import Testing
             let decoder = JSONDecoder()
             let responseState = ResponseState()
 
-            // Create the EventSource with the custom configuration
-            let eventSource = EventSource(request: request, configuration: configuration)
-
-            // Stream events asynchronously
+            // Use a proper async continuation pattern instead of polling
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                // Set up event handler
+                // Create the EventSource with the custom configuration
+                let eventSource = EventSource(request: request, configuration: configuration)
+
+                // Set up event handler immediately after creation
                 eventSource.onMessage = { event in
                     do {
                         // Decode the chunk
@@ -301,11 +304,18 @@ import Testing
                         }
                     }
                 }
+
+                // Add timeout protection
+                Task {
+                    try await Task.sleep(for: testTimeout)
+                    await eventSource.close()
+                    continuation.resume()
+                }
             }
 
             // Verify the final result
-            #expect(await responseState.getText() == "Hello there!")
-            #expect(await responseState.getEventCount() == 3)
+            #expect(await responseState.getText() == expectedText)
+            #expect(await responseState.getEventCount() == expectedEventCount)
             #expect(await responseState.isCompleted() == true)
         }
 
