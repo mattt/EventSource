@@ -411,7 +411,8 @@ struct ParserTests {
     struct CommentAndLineTests {
         @Test("Only comment lines and empty lines produce no events")
         func testOnlyCommentLinesAndEmptyLinesProduceNoEvents() async {
-            let stream = ":comment\n\n:another comment\r\n\r\n"  // Includes dispatch-triggering empty lines but no data fields
+            // Includes dispatch-triggering empty lines but no data fields
+            let stream = ":comment\n\n:another comment\r\n\r\n"
             let events = await getEvents(from: stream)
             #expect(
                 events.isEmpty,
