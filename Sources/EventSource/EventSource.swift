@@ -396,7 +396,9 @@ public actor EventSource {
 
                 // Perform the HTTP request and get an asynchronous byte stream.
                 let (byteStream, response) = try await session.bytes(
-                    for: currentRequest, delegate: nil)
+                    for: currentRequest,
+                    delegate: nil
+                )
 
                 // Validate HTTP response (status code and content type).
                 if let httpResponse = response as? HTTPURLResponse {

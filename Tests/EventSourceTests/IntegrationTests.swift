@@ -110,7 +110,8 @@ import Testing
             #expect((response as? HTTPURLResponse)?.statusCode == 200)
             #expect(
                 (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")
-                    == "text/event-stream")
+                    == "text/event-stream"
+            )
 
             // Stream events asynchronously
             for try await event in byteStream.events {
@@ -167,7 +168,8 @@ import Testing
                 #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
                 #expect(
                     request.value(forHTTPHeaderField: "Authorization")?.starts(with: "Bearer ")
-                        == true)
+                        == true
+                )
 
                 // Verify request body
                 if let bodyData = request.httpBody {
@@ -209,7 +211,8 @@ import Testing
             #expect((response as? HTTPURLResponse)?.statusCode == 200)
             #expect(
                 (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")
-                    == "text/event-stream")
+                    == "text/event-stream"
+            )
 
             // Stream events asynchronously
             for try await event in byteStream.events {
@@ -540,7 +543,8 @@ import Testing
                 #expect((response as? HTTPURLResponse)?.statusCode == 200)
                 #expect(
                     (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")
-                        == "text/event-stream")
+                        == "text/event-stream"
+                )
 
                 // Use the events extension to convert bytes to SSE events
                 let eventsSequence = byteStream.events
@@ -717,7 +721,9 @@ import Testing
 
                 // Create EventSource with the custom session
                 let eventSource = EventSource(
-                    request: request, configuration: session.configuration)
+                    request: request,
+                    configuration: session.configuration
+                )
 
                 // Set up error handler
                 let errorTracker = ErrorTracker()
@@ -794,7 +800,8 @@ import Testing
                 #expect((response as? HTTPURLResponse)?.statusCode == 200)
                 #expect(
                     (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")
-                        == "text/event-stream")
+                        == "text/event-stream"
+                )
 
                 // Stream events asynchronously
                 for try await event in byteStream.events {
@@ -857,7 +864,8 @@ import Testing
                         // Reference to the protocol instance (need to do this via reflection)
                         guard
                             let protocolInstance = request.value(
-                                forHTTPHeaderField: "_MockURLProtocolInstance") as? NSObjectProtocol
+                                forHTTPHeaderField: "_MockURLProtocolInstance"
+                            ) as? NSObjectProtocol
                         else {
                             return
                         }
@@ -923,7 +931,8 @@ import Testing
                         }
 
                         func setClientAndProtocol(
-                            client: NSObjectProtocol, protocolInstance: NSObjectProtocol
+                            client: NSObjectProtocol,
+                            protocolInstance: NSObjectProtocol
                         ) {
                             self.client = client
                             self.protocolInstance = protocolInstance
