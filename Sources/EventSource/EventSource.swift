@@ -26,6 +26,90 @@ public enum EventSourceError: Swift.Error, LocalizedError {
     }
 }
 
+#if canImport(FoundationNetworking)
+    /// Delegate for handling SSE streaming on Linux
+    final class LinuxSSEDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+        weak var owner: EventSource?
+        let parser: EventSource.Parser
+        private var lastProcessingTask: Task<Void, Never>?
+
+        init(owner: EventSource, parser: EventSource.Parser) {
+            self.owner = owner
+            self.parser = parser
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            dataTask: URLSessionDataTask,
+            didReceive response: URLResponse,
+            completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+        ) {
+            guard let http = response as? HTTPURLResponse else {
+                Task { await self.owner?.handleTerminalError(EventSourceError.invalidHTTPStatus(0)) }
+                completionHandler(.cancel)
+                return
+            }
+            let contentType = http.value(forHTTPHeaderField: "Content-Type")
+            if http.statusCode != 200 {
+                Task {
+                    await self.owner?.handleTerminalError(
+                        EventSourceError.invalidHTTPStatus(http.statusCode)
+                    )
+                }
+                completionHandler(.cancel)
+                return
+            }
+            if contentType?.lowercased().hasPrefix("text/event-stream") != true {
+                Task {
+                    await self.owner?.handleTerminalError(
+                        EventSourceError.invalidContentType(contentType)
+                    )
+                }
+                completionHandler(.cancel)
+                return
+            }
+            Task { await self.owner?.markOpen() }
+            completionHandler(.allow)
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            dataTask: URLSessionDataTask,
+            didReceive data: Data
+        ) {
+            guard let owner = owner else { return }
+            let previous = lastProcessingTask
+            let next = Task { [weak self] in
+                await previous?.value
+                guard let self else { return }
+                for b in data {
+                    if await owner.isClosed { break }
+                    await self.parser.consume(b)
+                    while let evt = await self.parser.getNextEvent() {
+                        await owner.deliver(evt)
+                    }
+                }
+            }
+            lastProcessingTask = next
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            didCompleteWithError error: Error?
+        ) {
+            let last = lastProcessingTask
+            Task { [weak self] in
+                guard let self else { return }
+                await last?.value
+                await parser.finish()
+                if let e = error { await owner?.emitError(e) }
+                await owner?.resumeLinuxCompletion()
+            }
+        }
+    }
+#endif
+
 /// `EventSource` manages a Server-Sent Events (SSE) connection.
 ///
 /// This implementation mirrors the API of JavaScript's EventSource
@@ -286,6 +370,13 @@ public actor EventSource {
     private var _onMessageCallback: (@Sendable (Event) async -> Void)?
     private var _onErrorCallback: (@Sendable (Swift.Error?) async -> Void)?
 
+    #if canImport(FoundationNetworking)
+        // Linux-specific streaming support
+        private var linuxSession: URLSession?
+        private var linuxTask: URLSessionDataTask?
+        private var linuxCompletion: CheckedContinuation<Void, Never>?
+    #endif
+
     /// The callback to invoke when the connection is opened.
     /// This callback is awaited before proceeding with reconnection or completion.
     nonisolated public var onOpen: (@Sendable () async -> Void)? {
@@ -332,6 +423,43 @@ public actor EventSource {
         self._onErrorCallback = callback
     }
 
+    #if canImport(FoundationNetworking)
+        // Linux-specific helpers
+        fileprivate var isClosed: Bool { readyState == .closed }
+
+        fileprivate func markOpen() async {
+            readyState = .open
+            await _onOpenCallback?()
+        }
+
+        fileprivate func deliver(_ event: Event) async {
+            await _onMessageCallback?(event)
+        }
+
+        fileprivate func emitError(_ error: Error?) async {
+            await _onErrorCallback?(error)
+        }
+
+        fileprivate func handleTerminalError(_ error: Error) async {
+            await emitError(error)
+            readyState = .closed
+            linuxTask?.cancel()
+            linuxSession?.invalidateAndCancel()
+            await resumeLinuxCompletion()
+        }
+
+        fileprivate func waitForLinuxCompletion() async {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                linuxCompletion = cont
+            }
+        }
+
+        fileprivate func resumeLinuxCompletion() {
+            linuxCompletion?.resume()
+            linuxCompletion = nil
+        }
+    #endif
+
     /// Initializes a new EventSource and begins connecting to the given URL.
     ///
     /// - Parameter url: The URL to open the SSE connection to.
@@ -374,6 +502,10 @@ public actor EventSource {
         readyState = .closed
         connectionTask?.cancel()
         connectionTask = nil
+        #if canImport(FoundationNetworking)
+            linuxTask?.cancel()
+            linuxSession?.invalidateAndCancel()
+        #endif
     }
 
     /// Continuously handles connecting and reconnecting to the SSE stream.
@@ -407,41 +539,66 @@ public actor EventSource {
                     currentRequest.setValue(lastEventId, forHTTPHeaderField: "Last-Event-ID")
                 }
 
-                let (byteStream, response) = try await session.bytes(
-                    for: currentRequest,
-                    delegate: nil
-                )
+                // Perform the HTTP request with streaming support
+                #if canImport(FoundationNetworking)
+                    // Linux: Use URLSessionDataTask with delegate for streaming
+                    let delegate = LinuxSSEDelegate(owner: self, parser: parser)
+                    let delegateQueue = OperationQueue()
+                    delegateQueue.maxConcurrentOperationCount = 1
+                    let linuxSession = URLSession(
+                        configuration: session.configuration,
+                        delegate: delegate,
+                        delegateQueue: delegateQueue
+                    )
+                    self.linuxSession = linuxSession
+                    let task = linuxSession.dataTask(with: currentRequest)
+                    self.linuxTask = task
+                    task.resume()
 
-                // Validate HTTP response (status code and content type).
-                if let httpResponse = response as? HTTPURLResponse {
-                    let status = httpResponse.statusCode
-                    if status != 200 {
-                        throw EventSourceError.invalidHTTPStatus(status)
+                    // Wait until the stream completes (server closed or error)
+                    await waitForLinuxCompletion()
+                #else
+                    // Apple platforms: Use URLSession.bytes for true streaming
+                    let (byteStream, response) = try await session.bytes(
+                        for: currentRequest,
+                        delegate: nil
+                    )
+
+                    // Validate HTTP response (status code and content type).
+                    if let httpResponse = response as? HTTPURLResponse {
+                        let status = httpResponse.statusCode
+                        if status != 200 {
+                            throw EventSourceError.invalidHTTPStatus(status)
+                        }
+                        let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")
+                        if contentType?.lowercased().hasPrefix("text/event-stream") != true {
+                            throw EventSourceError.invalidContentType(contentType)
+                        }
+                    } else {
+                        throw EventSourceError.invalidHTTPStatus(0)
                     }
-                    let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")
-                    if contentType?.lowercased().hasPrefix("text/event-stream") != true {
-                        throw EventSourceError.invalidContentType(contentType)
-                    }
-                } else {
-                    throw EventSourceError.invalidHTTPStatus(0)
-                }
 
-                // Connection is established and content type is correct.
-                readyState = .open
-                await _onOpenCallback?()
-
-                // Read the incoming byte stream and parse events.
-                for try await byte in byteStream {
-                    if Task.isCancelled || readyState == .closed {
-                        break
+                    // Connection is established and content type is correct.
+                    readyState = .open
+                    if let onOpen = _onOpenCallback {
+                        await onOpen()
                     }
 
-                    await parser.consume(byte)
+                    // Read the incoming byte stream and parse events.
+                    for try await byte in byteStream {
+                        if Task.isCancelled || readyState == .closed {
+                            break
+                        }
 
-                    while let event = await parser.getNextEvent() {
-                        await _onMessageCallback?(event)
+                        await parser.consume(byte)
+
+                        while let event = await parser.getNextEvent() {
+                            if let onMessage = _onMessageCallback {
+                                await onMessage(event)
+                            }
+                        }
                     }
-                }
+                #endif
 
                 // End of stream reached (server closed connection).
                 await parser.finish()  // finalize parsing, delivers any pending events to queue
