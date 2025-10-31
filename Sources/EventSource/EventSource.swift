@@ -248,6 +248,7 @@ public actor EventSource {
                 handleLine(line)
             }
 
+            // Send an empty line to trigger event dispatch
             if !currentData.isEmpty || currentEventId != nil || currentEventType != nil {
                 handleLine("")
             }
@@ -268,6 +269,17 @@ public actor EventSource {
 
     /// The current state of the connection (connecting, open, or closed).
     public private(set) var readyState: ReadyState = .connecting
+
+    /// The maximum number of events to deliver when finalizing parsing.
+    ///
+    /// This limit prevents unbounded memory growth in edge cases where
+    /// a server sends a large burst of events just before closing the connection.
+    /// When the limit is reached, remaining events in the parser's queue are discarded.
+    ///
+    /// The default value of 100 should be sufficient for most use cases.
+    /// Increase this value if your application needs to buffer more events
+    /// during connection finalization.
+    public var maximumFinalizationEventCount: Int = 100
 
     // Backing storage for callbacks
     private var _onOpenCallback: (@Sendable () async -> Void)?
@@ -434,7 +446,8 @@ public actor EventSource {
 
                 // Deliver any events that were queued during finish()
                 var eventsDelivered = 0
-                while let event = await parser.getNextEvent(), eventsDelivered < 100 {
+                let maxEvents = maximumFinalizationEventCount
+                while let event = await parser.getNextEvent(), eventsDelivered < maxEvents {
                     eventsDelivered += 1
                     await _onMessageCallback?(event)
                 }
