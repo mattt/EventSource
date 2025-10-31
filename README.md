@@ -10,6 +10,7 @@ A lightweight, spec-compliant Server-Sent Events (SSE) client for Swift.
 - [x] Support for different line break formats (`LF`, `CR`, `CRLF`)
 - [x] Multi-line data aggregation
 - [x] `AsyncSequence` support for streaming events
+- [x] Works on all Apple platforms and Linux
 
 ## Requirements
 
@@ -23,7 +24,7 @@ Add the following to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mattt/EventSource.git", from: "1.1.1")
+    .package(url: "https://github.com/mattt/EventSource.git", from: "1.3.0")
 ]
 ```
 
