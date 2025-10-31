@@ -238,6 +238,9 @@ import Testing
                 // Create the EventSource with the custom configuration
                 let eventSource = EventSource(request: request, configuration: configuration)
 
+                // Give the connection task a chance to start
+                await Task.yield()
+
                 // Track received events
                 actor EventTracker {
                     var events: [EventSource.Event] = []
