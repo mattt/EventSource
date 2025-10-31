@@ -248,8 +248,6 @@ public actor EventSource {
                 handleLine(line)
             }
 
-            // Send an empty line to trigger event dispatch for most test cases
-            // This matches the behavior expected by most tests
             if !currentData.isEmpty || currentEventId != nil || currentEventType != nil {
                 handleLine("")
             }
@@ -272,12 +270,12 @@ public actor EventSource {
     public private(set) var readyState: ReadyState = .connecting
 
     // Backing storage for callbacks
-    private var _onOpenCallback: (@Sendable () -> Void)?
-    private var _onMessageCallback: (@Sendable (Event) -> Void)?
-    private var _onErrorCallback: (@Sendable (Swift.Error?) -> Void)?
+    private var _onOpenCallback: (@Sendable () async -> Void)?
+    private var _onMessageCallback: (@Sendable (Event) async -> Void)?
+    private var _onErrorCallback: (@Sendable (Swift.Error?) async -> Void)?
 
     /// The callback to invoke when the connection is opened.
-    nonisolated public var onOpen: (@Sendable () -> Void)? {
+    nonisolated public var onOpen: (@Sendable () async -> Void)? {
         get { fatalError("onOpen can only be set, not read") }
         set {
             if let newValue {
@@ -287,7 +285,8 @@ public actor EventSource {
     }
 
     /// The callback to invoke when a message is received.
-    nonisolated public var onMessage: (@Sendable (Event) -> Void)? {
+    /// This callback is awaited before proceeding with reconnection or completion.
+    nonisolated public var onMessage: (@Sendable (Event) async -> Void)? {
         get { fatalError("onMessage can only be set, not read") }
         set {
             if let newValue {
@@ -297,7 +296,7 @@ public actor EventSource {
     }
 
     /// The callback to invoke when an error occurs.
-    nonisolated public var onError: (@Sendable (Swift.Error?) -> Void)? {
+    nonisolated public var onError: (@Sendable (Swift.Error?) async -> Void)? {
         get { fatalError("onError can only be set, not read") }
         set {
             if let newValue {
@@ -307,15 +306,15 @@ public actor EventSource {
     }
 
     // Actor-isolated setters
-    private func setOnOpenCallback(_ callback: @escaping @Sendable () -> Void) {
+    private func setOnOpenCallback(_ callback: @escaping @Sendable () async -> Void) {
         self._onOpenCallback = callback
     }
 
-    private func setOnMessageCallback(_ callback: @escaping @Sendable (Event) -> Void) {
+    private func setOnMessageCallback(_ callback: @escaping @Sendable (Event) async -> Void) {
         self._onMessageCallback = callback
     }
 
-    private func setOnErrorCallback(_ callback: @escaping @Sendable (Swift.Error?) -> Void) {
+    private func setOnErrorCallback(_ callback: @escaping @Sendable (Swift.Error?) async -> Void) {
         self._onErrorCallback = callback
     }
 
@@ -394,7 +393,6 @@ public actor EventSource {
                     currentRequest.setValue(lastEventId, forHTTPHeaderField: "Last-Event-ID")
                 }
 
-                // Perform the HTTP request and get an asynchronous byte stream.
                 let (byteStream, response) = try await session.bytes(
                     for: currentRequest,
                     delegate: nil
@@ -404,53 +402,47 @@ public actor EventSource {
                 if let httpResponse = response as? HTTPURLResponse {
                     let status = httpResponse.statusCode
                     if status != 200 {
-                        // HTTP status not OK -> do not reconnect (per spec, fail the connection).
                         throw EventSourceError.invalidHTTPStatus(status)
                     }
-                    // Check Content-Type header
                     let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")
                     if contentType?.lowercased().hasPrefix("text/event-stream") != true {
                         throw EventSourceError.invalidContentType(contentType)
                     }
                 } else {
-                    // Non-HTTP response (unlikely for URLSession) -> treat as error.
                     throw EventSourceError.invalidHTTPStatus(0)
                 }
 
                 // Connection is established and content type is correct.
-                // Update state to `.open` and notify.
                 readyState = .open
-                if let onOpen = _onOpenCallback {
-                    onOpen()
-                }
+                await _onOpenCallback?()
 
                 // Read the incoming byte stream and parse events.
                 for try await byte in byteStream {
-                    // If closed or task cancelled during streaming, break out.
                     if Task.isCancelled || readyState == .closed {
                         break
                     }
 
                     await parser.consume(byte)
 
-                    // Retrieve all complete events available after processing this byte.
                     while let event = await parser.getNextEvent() {
-                        // Trigger onMessage callback for each event.
-                        if let onMessage = _onMessageCallback {
-                            onMessage(event)
-                        }
+                        await _onMessageCallback?(event)
                     }
                 }
 
                 // End of stream reached (server closed connection).
-                await parser.finish()  // finalize parsing, drop any partial event
+                await parser.finish()  // finalize parsing, delivers any pending events to queue
+
+                // Deliver any events that were queued during finish()
+                var eventsDelivered = 0
+                while let event = await parser.getNextEvent(), eventsDelivered < 100 {
+                    eventsDelivered += 1
+                    await _onMessageCallback?(event)
+                }
 
                 // If not cancelled and still open, treat as a disconnection to reconnect.
                 if !Task.isCancelled && readyState != .closed {
                     // Notify an error event due to unexpected close, then loop to reconnect.
-                    if let onError = _onErrorCallback {
-                        onError(nil)  // stream closed without error (will attempt reconnect)
-                    }
+                    await _onErrorCallback?(nil)  // stream closed without error (will attempt reconnect)
                 } else {
                     // If cancelled or closed intentionally, break without reconnecting.
                     break
@@ -463,9 +455,7 @@ public actor EventSource {
                 }
 
                 // Notify error event.
-                if let onError = _onErrorCallback {
-                    onError(error)
-                }
+                await _onErrorCallback?(error)
 
                 // For HTTP status/content-type errors, break out (do not reconnect as per spec).
                 if error is EventSourceError {
