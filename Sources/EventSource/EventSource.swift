@@ -287,6 +287,7 @@ public actor EventSource {
     private var _onErrorCallback: (@Sendable (Swift.Error?) async -> Void)?
 
     /// The callback to invoke when the connection is opened.
+    /// This callback is awaited before proceeding with reconnection or completion.
     nonisolated public var onOpen: (@Sendable () async -> Void)? {
         get { fatalError("onOpen can only be set, not read") }
         set {
@@ -308,6 +309,7 @@ public actor EventSource {
     }
 
     /// The callback to invoke when an error occurs.
+    /// This callback is awaited before proceeding with reconnection or completion.
     nonisolated public var onError: (@Sendable (Swift.Error?) async -> Void)? {
         get { fatalError("onError can only be set, not read") }
         set {
