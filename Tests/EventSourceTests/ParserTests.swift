@@ -4,13 +4,13 @@ import Testing
 @Suite("EventSource Parser Tests", .timeLimit(.minutes(1)))
 struct ParserTests {
     @Test("Empty stream produces no events")
-    func testEmptyStreamProducesNoEvents() async {
+    func emptyStreamProducesNoEvents() async {
         let events = await getEvents(from: "")
         #expect(events.isEmpty)
     }
 
     @Test("Comment only stream produces no events")
-    func testCommentOnlyStreamProducesNoEvents() async {
+    func commentOnlyStreamProducesNoEvents() async {
         let stream = ":comment line 1\n:comment line 2\r\n"
         let events = await getEvents(from: stream)
         #expect(events.isEmpty)
@@ -19,7 +19,7 @@ struct ParserTests {
     @Suite("Single Line Event Tests")
     struct SingleLineEventTests {
         @Test("LF line breaks")
-        func testSingleLineEventLF() async {
+        func singleLineEventLF() async {
             let stream = "data: test data\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -29,7 +29,7 @@ struct ParserTests {
         }
 
         @Test("CR line breaks")
-        func testSingleLineEventCR() async {
+        func singleLineEventCR() async {
             let stream = "data: test data\r\r"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -37,7 +37,7 @@ struct ParserTests {
         }
 
         @Test("CRLF line breaks")
-        func testSingleLineEventCRLF() async {
+        func singleLineEventCRLF() async {
             let stream = "data: test data\r\n\r\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -46,7 +46,7 @@ struct ParserTests {
     }
 
     @Test("Multi-line data")
-    func testMultiLineData() async {
+    func multiLineData() async {
         let stream = "data: line1\ndata: line2\n\n"
         let events = await getEvents(from: stream)
         #expect(events.count == 1)
@@ -56,7 +56,7 @@ struct ParserTests {
     @Suite("Event Field Tests")
     struct EventFieldTests {
         @Test("Event with ID")
-        func testEventWithID() async {
+        func eventWithID() async {
             let stream = "id: 123\ndata: test data\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -70,7 +70,7 @@ struct ParserTests {
         }
 
         @Test("Event with NUL in ID is ignored")
-        func testEventWithNULInIDIsIgnoredAndDoesNotSetLastEventID() async {
+        func eventWithNULInIDIsIgnoredAndDoesNotSetLastEventID() async {
             let stream = "id: abc\0def\ndata: test\n\n"  // ID with NUL
             let parser = EventSource.Parser()
 
@@ -101,7 +101,7 @@ struct ParserTests {
         }
 
         @Test("ID reset by empty ID line")
-        func testIDResetByEmptyIDLine() async {
+        func idResetByEmptyIDLine() async {
             let stream = "id: 123\ndata: event1\n\nid: \ndata: event2\n\n"
             let parser = EventSource.Parser()
 
@@ -133,7 +133,7 @@ struct ParserTests {
         }
 
         @Test("Event with name")
-        func testEventWithName() async {
+        func eventWithName() async {
             let stream = "event: custom\ndata: test data\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -142,7 +142,7 @@ struct ParserTests {
         }
 
         @Test("Retry field")
-        func testRetryField() async {
+        func retryField() async {
             let stream = "retry: 5000\ndata: test data\n\n"
             let parser = EventSource.Parser()
             // Manually consume and finish to inspect parser state before getting all events
@@ -166,7 +166,7 @@ struct ParserTests {
         }
 
         @Test("Retry field only updates reconnection time")
-        func testRetryFieldOnlyUpdatesReconnectionTimeDoesNotDispatchEvent() async {
+        func retryFieldOnlyUpdatesReconnectionTimeDoesNotDispatchEvent() async {
             let stream = "retry: 1234\n\n"  // Only retry, no data or other fields
             let parser = EventSource.Parser()
             let initialReconnectionTime = await parser.getReconnectionTime()
@@ -182,7 +182,7 @@ struct ParserTests {
         }
 
         @Test("Invalid retry value")
-        func testInvalidRetryField() async {
+        func invalidRetryField() async {
             let parser = EventSource.Parser()
             let bytes = "retry: invalid\n\n".utf8
             for byte in bytes {
@@ -197,7 +197,7 @@ struct ParserTests {
     }
 
     @Test("Multiple events")
-    func testMultipleEvents() async {
+    func multipleEvents() async {
         let stream = "data: event1\n\nevent: custom\ndata: event2\nid: e2\n\n"
         let events = await getEvents(from: stream)
         #expect(events.count == 2)
@@ -212,7 +212,7 @@ struct ParserTests {
     }
 
     @Test("Mixed line endings produce correct events")
-    func testMixedLineEndingsProduceCorrectEvents() async {
+    func mixedLineEndingsProduceCorrectEvents() async {
         let stream =
             "data: event1\r\r" + "data: event2\n\n" + "data: event3\r\n\r\n"
             + "id: e4\rdata: event4\r\r"  // `id: e4` is one line, `data: event4` is next, then dispatch
@@ -232,7 +232,7 @@ struct ParserTests {
     @Suite("Field Parsing Tests")
     struct FieldParsingTests {
         @Test("Colon space parsing")
-        func testColonSpaceParsing() async {
+        func colonSpaceParsing() async {
             // Case 1: "data:value"
             let stream1 = "data:value1\n\n"
             let events1 = await getEvents(from: stream1)
@@ -253,7 +253,7 @@ struct ParserTests {
         }
 
         @Test("Unicode in data")
-        func testUnicodeInData() async {
+        func unicodeInData() async {
             // Adapted from https://github.com/launchdarkly/swift-eventsource/blob/193c097f324666691f71b49b1e70249ef21f9f62/Tests/UTF8LineParserTests.swift#L59
             let unicodeData = "¯\\_(ツ)_/¯0️⃣🇺🇸Z̮̞̠͙͔ͅḀ̗̞͈̻̗Ḷ͙͎̯̹̞͓G̻O̭̗̮𝓯𝓸𝔁✅"
             let stream = "data: \(unicodeData)\n\n"
@@ -263,7 +263,7 @@ struct ParserTests {
         }
 
         @Test("NUL character in data")
-        func testNULCharacterInData() async {
+        func nulCharacterInData() async {
             let dataWithNul = "hello\0world"
             let stream = "data: \(dataWithNul)\n\n"
             let events = await getEvents(from: stream)
@@ -272,7 +272,7 @@ struct ParserTests {
         }
 
         @Test("Invalid UTF8 sequence becomes replacement character")
-        func testInvalidUTF8SequenceBecomesReplacementCharacter() async {
+        func invalidUTF8SequenceBecomesReplacementCharacter() async {
             // Create a byte array with an invalid UTF-8 sequence
             var invalidBytesStream: [UInt8] = []
             // Add "data: test" as raw bytes
@@ -305,21 +305,21 @@ struct ParserTests {
         }
 
         @Test("Field without colon is ignored")
-        func testFieldWithoutColonIsIgnored() async {
+        func fieldWithoutColonIsIgnored() async {
             let stream = "data test\n\n"
             let events = await getEvents(from: stream)
             #expect(events.isEmpty)
         }
 
         @Test("Field with empty name is ignored")
-        func testFieldWithEmptyNameIsIgnored() async {
+        func fieldWithEmptyNameIsIgnored() async {
             let stream = ": value\n\n"
             let events = await getEvents(from: stream)
             #expect(events.isEmpty)
         }
 
         @Test("Field with empty value")
-        func testFieldWithEmptyValue() async {
+        func fieldWithEmptyValue() async {
             let stream = "data:\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -327,7 +327,7 @@ struct ParserTests {
         }
 
         @Test("Field with only spaces after colon")
-        func testFieldWithOnlySpacesAfterColon() async {
+        func fieldWithOnlySpacesAfterColon() async {
             let stream = "data:   \n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -335,7 +335,7 @@ struct ParserTests {
         }
 
         @Test("Field with tab after colon")
-        func testFieldWithTabAfterColon() async {
+        func fieldWithTabAfterColon() async {
             let stream = "data:\tvalue\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -343,7 +343,7 @@ struct ParserTests {
         }
 
         @Test("Field with multiple colons")
-        func testFieldWithMultipleColons() async {
+        func fieldWithMultipleColons() async {
             let stream = "data:value:with:colons\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -351,7 +351,7 @@ struct ParserTests {
         }
 
         @Test("Field with leading and trailing spaces")
-        func testFieldWithLeadingAndTrailingSpaces() async {
+        func fieldWithLeadingAndTrailingSpaces() async {
             let stream = "data:  value  \n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -362,7 +362,7 @@ struct ParserTests {
     @Suite("Empty Field Tests")
     struct EmptyFieldTests {
         @Test("Empty data field dispatch")
-        func testEmptyDataFieldDispatch() async {
+        func emptyDataFieldDispatch() async {
             // An event with a "data" field that results in empty string data should still be dispatched.
             // "data" (field name with empty value)
             let stream1 = "data\n\n"
@@ -378,7 +378,7 @@ struct ParserTests {
         }
 
         @Test("Fields without value are processed correctly")
-        func testFieldsWithoutValueAreProcessedCorrectly() async {
+        func fieldsWithoutValueAreProcessedCorrectly() async {
             // According to spec:
             // - "event" (no value): event type set to empty string.
             // - "data" (no value): data buffer gets an empty string.
@@ -410,7 +410,7 @@ struct ParserTests {
     @Suite("Comment and Line Tests")
     struct CommentAndLineTests {
         @Test("Only comment lines and empty lines produce no events")
-        func testOnlyCommentLinesAndEmptyLinesProduceNoEvents() async {
+        func onlyCommentLinesAndEmptyLinesProduceNoEvents() async {
             // Includes dispatch-triggering empty lines but no data fields
             let stream = ":comment\n\n:another comment\r\n\r\n"
             let events = await getEvents(from: stream)
@@ -421,7 +421,7 @@ struct ParserTests {
         }
 
         @Test("Line without colon is ignored")
-        func testLineWithoutColonIsIgnored() async {
+        func lineWithoutColonIsIgnored() async {
             let stream = "this is a bogus line\ndata: valid\n\nthis is also bogus\r\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1, "Only one event from the valid 'data: valid' line.")
@@ -429,7 +429,7 @@ struct ParserTests {
         }
 
         @Test("Complex mixed comments and events")
-        func testMixedCommentsAndEvents() async {
+        func mixedCommentsAndEvents() async {
             let parser = EventSource.Parser()
             let bytes = """
                 :initial comment
@@ -467,7 +467,7 @@ struct ParserTests {
         }
 
         @Test("Final line unterminated is processed by finish")
-        func testFinalLineUnterminatedIsProcessedByCurrentFinishLogic() async {
+        func finalLineUnterminatedIsProcessedByCurrentFinishLogic() async {
             // This test reflects the current behavior of Parser.finish().
             // As noted, the SSE spec suggests an unterminated final block without a blank line should be discarded.
             // Your parser's finish() method currently dispatches such events.
@@ -487,7 +487,7 @@ struct ParserTests {
         }
 
         @Test("Empty comment")
-        func testEmptyComment() async {
+        func emptyComment() async {
             let stream = ":\ndata: test\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -495,7 +495,7 @@ struct ParserTests {
         }
 
         @Test("Comment with colon in body")
-        func testCommentWithColonInBody() async {
+        func commentWithColonInBody() async {
             let stream = ":comment:with:colons\ndata: test\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -503,7 +503,7 @@ struct ParserTests {
         }
 
         @Test("Comment with leading space")
-        func testCommentWithLeadingSpace() async {
+        func commentWithLeadingSpace() async {
             let stream = ": comment with leading space\ndata: test\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -511,7 +511,7 @@ struct ParserTests {
         }
 
         @Test("Multiple consecutive comments")
-        func testMultipleConsecutiveComments() async {
+        func multipleConsecutiveComments() async {
             let stream = ":comment1\n:comment2\n:comment3\ndata: test\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -519,7 +519,7 @@ struct ParserTests {
         }
 
         @Test("Comment between data lines")
-        func testCommentBetweenDataLines() async {
+        func commentBetweenDataLines() async {
             let stream = "data: line1\n:comment\ndata: line2\n\n"
             let events = await getEvents(from: stream)
             #expect(events.count == 1)
@@ -530,7 +530,7 @@ struct ParserTests {
     @Suite("BOM Tests")
     struct BOMTests {
         @Test("UTF8 BOM at stream start is handled")
-        func testUtf8BOMAtStreamStartIsHandled() async {
+        func utf8BOMAtStreamStartIsHandled() async {
             // Create a byte array with UTF-8 BOM followed by SSE content
             var fullStreamBytes: [UInt8] = []
             // Add UTF-8 BOM
@@ -565,7 +565,7 @@ struct ParserTests {
     @Suite("Retry Field")
     struct RetryFieldTests {
         @Test("Only retry field - no event")
-        func testOnlyRetryField() async throws {
+        func onlyRetryField() async throws {
             let sseData = "retry: 1000\n\n"
 
             var iterator = AsyncBytes(sseData.utf8).events.makeAsyncIterator()
@@ -574,7 +574,7 @@ struct ParserTests {
         }
 
         @Test("Retry with data")
-        func testRetryWithData() async throws {
+        func retryWithData() async throws {
             let sseData = """
                 retry: 1000
                 data: hello
@@ -589,7 +589,7 @@ struct ParserTests {
         }
 
         @Test("Retry with no space after colon")
-        func testRetryWithNoSpace() async {
+        func retryWithNoSpace() async {
             let stream = "retry:7000\ndata: test\n\n"
             let parser = EventSource.Parser()
             for byte in stream.utf8 {
@@ -600,7 +600,7 @@ struct ParserTests {
         }
 
         @Test("Retry with non-numeric value")
-        func testRetryWithNonNumericValue() async {
+        func retryWithNonNumericValue() async {
             let stream = "retry: 7000L\ndata: test\n\n"
             let parser = EventSource.Parser()
             let initialReconnectionTime = await parser.getReconnectionTime()
@@ -612,7 +612,7 @@ struct ParserTests {
         }
 
         @Test("Empty retry field")
-        func testEmptyRetryField() async {
+        func emptyRetryField() async {
             let stream = "retry\ndata: test\n\n"
             let parser = EventSource.Parser()
             let initialReconnectionTime = await parser.getReconnectionTime()
@@ -624,7 +624,7 @@ struct ParserTests {
         }
 
         @Test("Retry with out of bounds value")
-        func testRetryWithOutOfBoundsValue() async {
+        func retryWithOutOfBoundsValue() async {
             let stream = "retry: 10000000000000000000000000\ndata: test\n\n"
             let parser = EventSource.Parser()
             let initialReconnectionTime = await parser.getReconnectionTime()
@@ -636,7 +636,7 @@ struct ParserTests {
         }
 
         @Test("Retry persists across events")
-        func testRetryPersistsAcrossEvents() async {
+        func retryPersistsAcrossEvents() async {
             let stream = "retry: 7000\ndata: event1\n\nretry: 5000\ndata: event2\n\n"
             let parser = EventSource.Parser()
             for byte in stream.utf8 {

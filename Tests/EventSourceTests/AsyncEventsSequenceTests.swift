@@ -5,7 +5,7 @@ import Testing
 @Suite("AsyncEventsSequence Tests", .timeLimit(.minutes(1)))
 struct AsyncEventsSequenceTests {
     @Test("Basic event parsing from byte sequence")
-    func testBasicEventParsing() async throws {
+    func basicEventParsing() async throws {
         // Create a simple SSE data string
         let sseData = "data: hello\n\n"
 
@@ -28,7 +28,7 @@ struct AsyncEventsSequenceTests {
     }
 
     @Test("Multiple events parsing")
-    func testMultipleEventsParsing() async throws {
+    func multipleEventsParsing() async throws {
         // Create a string with multiple SSE events
         let sseData = """
             data: event1
@@ -55,7 +55,7 @@ struct AsyncEventsSequenceTests {
     }
 
     @Test("Event with all fields")
-    func testEventWithAllFields() async throws {
+    func eventWithAllFields() async throws {
         let sseData = """
             id: 123
             event: test
@@ -75,7 +75,7 @@ struct AsyncEventsSequenceTests {
     }
 
     @Test("Empty sequence")
-    func testEmptySequence() async throws {
+    func emptySequence() async throws {
         let emptySequence = AsyncBytes("".utf8).events
         var iterator = emptySequence.makeAsyncIterator()
         let event = try await iterator.next()
@@ -85,7 +85,7 @@ struct AsyncEventsSequenceTests {
     @Suite("Line Break Handling")
     struct LineBreakTests {
         @Test("CRLF line breaks")
-        func testCRLFLineBreaks() async throws {
+        func crlfLineBreaks() async throws {
             let sseData = "data: hello\r\n\r\n"
             var iterator = AsyncBytes(sseData.utf8).events.makeAsyncIterator()
             let event = try await iterator.next()
@@ -95,7 +95,7 @@ struct AsyncEventsSequenceTests {
         }
 
         @Test("CR line breaks")
-        func testCRLineBreaks() async throws {
+        func crLineBreaks() async throws {
             let sseData = "data: hello\r\r"
             var iterator = AsyncBytes(sseData.utf8).events.makeAsyncIterator()
             let event = try await iterator.next()
@@ -108,7 +108,7 @@ struct AsyncEventsSequenceTests {
     @Suite("Comment Handling")
     struct CommentTests {
         @Test("Comments in event stream")
-        func testComments() async throws {
+        func comments() async throws {
             let sseData = """
                 :comment line
                 data: hello
@@ -124,7 +124,7 @@ struct AsyncEventsSequenceTests {
         }
 
         @Test("Only comments")
-        func testOnlyComments() async throws {
+        func onlyComments() async throws {
             let sseData = """
                 :comment line 1
                 :comment line 2
@@ -140,7 +140,7 @@ struct AsyncEventsSequenceTests {
     @Suite("Multi-line Data")
     struct MultilineDataTests {
         @Test("Multiple data lines")
-        func testMultipleDataLines() async throws {
+        func multipleDataLines() async throws {
             let sseData = """
                 data: line1
                 data: line2
@@ -156,7 +156,7 @@ struct AsyncEventsSequenceTests {
         }
 
         @Test("Empty data line")
-        func testEmptyDataLine() async throws {
+        func emptyDataLine() async throws {
             // The SSE spec states that if there's a data: field with no value,
             // it should be treated as an empty string value, not as absent data
             let parser = EventSource.Parser()
@@ -175,7 +175,7 @@ struct AsyncEventsSequenceTests {
     @Suite("Retry Field")
     struct RetryFieldTests {
         @Test("Only retry field - no event")
-        func testOnlyRetryField() async throws {
+        func onlyRetryField() async throws {
             let sseData = "retry: 1000\n\n"
 
             var iterator = AsyncBytes(sseData.utf8).events.makeAsyncIterator()
@@ -184,7 +184,7 @@ struct AsyncEventsSequenceTests {
         }
 
         @Test("Retry with data")
-        func testRetryWithData() async throws {
+        func retryWithData() async throws {
             let sseData = """
                 retry: 1000
                 data: hello
@@ -202,7 +202,7 @@ struct AsyncEventsSequenceTests {
     @Suite("Chunked Data")
     struct ChunkedDataTests {
         @Test("Chunked delivery simulation")
-        func testChunkedDelivery() async throws {
+        func chunkedDelivery() async throws {
             // Simulate chunked SSE data delivery
             let eventData = "id: 123\nevent: update\ndata: partial content\ndata: more content\n\n"
 
@@ -231,7 +231,7 @@ struct AsyncEventsSequenceTests {
         }
 
         @Test("Event spanning multiple chunks")
-        func testEventSpanningChunks() async throws {
+        func eventSpanningChunks() async throws {
             // Create events with fixed size, non-recursive approach
             let eventData = "data: first event\n\ndata: second event\n\ndata: third event\n\n"
 
@@ -261,7 +261,7 @@ struct AsyncEventsSequenceTests {
     }
 
     @Test("Integration with AsyncSequence operators")
-    func testAsyncSequenceIntegration() async throws {
+    func asyncSequenceIntegration() async throws {
         let sseData = "data: event1\n\ndata: event2\n\ndata: event3\n\n"
 
         // Convert to async sequence of bytes
