@@ -8,20 +8,33 @@
         import FoundationNetworking
     #endif
 
+    /// Errors thrown by the AsyncHTTPClient transport adapter.
     enum EventSourceAsyncHTTPClientError: Error {
+        /// The request does not contain a valid URL.
         case invalidRequestURL
+        /// The AsyncHTTPClient response cannot be converted to ``HTTPURLResponse``.
         case invalidResponse
     }
 
+    /// Executes EventSource requests and returns a byte stream with response metadata.
     protocol EventSourceByteStreamingBackend: Sendable {
+        /// Executes the given request with the provided timeout.
+        ///
+        /// - Parameters:
+        ///   - request: The request to execute.
+        ///   - timeout: The request timeout.
+        /// - Returns: A converted HTTP response and a streaming byte sequence.
+        /// - Throws: An error if the request fails or response conversion is invalid.
         func execute(_ request: URLRequest, timeout: TimeAmount) async throws -> (
             response: HTTPURLResponse, bytes: AsyncThrowingStream<UInt8, Error>
         )
     }
 
+    /// Coordinates one-time shutdown for a shared ``HTTPClient`` instance.
     actor ShutdownCoordinator {
         private var hasShutdown = false
 
+        /// Shuts down the client once, and ignores subsequent calls.
         func shutdown(client: HTTPClient) async {
             guard !hasShutdown else { return }
             hasShutdown = true
@@ -29,6 +42,7 @@
         }
     }
 
+    /// AsyncHTTPClient-backed implementation of ``EventSourceByteStreamingBackend``.
     struct AsyncHTTPClientBackend: EventSourceByteStreamingBackend {
         func execute(_ request: URLRequest, timeout: TimeAmount) async throws -> (
             response: HTTPURLResponse, bytes: AsyncThrowingStream<UInt8, Error>
@@ -55,9 +69,10 @@
 
             do {
                 let response = try await client.execute(clientRequest, timeout: timeout)
-                var responseHeaders: [String: String] = [:]
+
                 // HTTPURLResponse requires a [String: String] map, so duplicate header fields
                 // (for example, multiple Set-Cookie values) cannot be preserved independently.
+                var responseHeaders: [String: String] = [:]
                 for header in response.headers {
                     if let existing = responseHeaders[header.name] {
                         responseHeaders[header.name] = existing + ", " + header.value
@@ -66,6 +81,7 @@
                     }
                 }
 
+                // Convert the response to an HTTPURLResponse.
                 guard
                     let httpResponse = HTTPURLResponse(
                         url: url,
@@ -77,6 +93,7 @@
                     throw EventSourceAsyncHTTPClientError.invalidResponse
                 }
 
+                // Convert the response body to a stream of bytes.
                 let bytes = AsyncThrowingStream<UInt8, Error> { continuation in
                     let task = Task {
                         do {
@@ -107,7 +124,14 @@
         }
     }
 
+    /// Decides when Linux URLSession failures should fall back to AsyncHTTPClient.
     enum EventSourceFallbackPolicy {
+        /// Returns whether fallback should occur for the given error.
+        ///
+        /// - Parameters:
+        ///   - useAsyncHTTPClientOnLinux: Whether this instance already uses AsyncHTTPClient.
+        ///   - error: The failure from the current connection attempt.
+        /// - Returns: `true` when fallback should switch transports, otherwise `false`.
         static func shouldFallback(
             useAsyncHTTPClientOnLinux: Bool,
             error: Error
