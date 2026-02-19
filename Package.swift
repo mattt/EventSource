@@ -41,7 +41,14 @@ let package = Package(
         ),
         .testTarget(
             name: "EventSourceTests",
-            dependencies: ["EventSource"]
+            dependencies: [
+                "EventSource",
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["AsyncHTTPClient"])
+                ),
+            ]
         ),
     ]
 )
