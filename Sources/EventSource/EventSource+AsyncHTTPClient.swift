@@ -56,6 +56,8 @@
             do {
                 let response = try await client.execute(clientRequest, timeout: timeout)
                 var responseHeaders: [String: String] = [:]
+                // HTTPURLResponse requires a [String: String] map, so duplicate header fields
+                // (for example, multiple Set-Cookie values) cannot be preserved independently.
                 for header in response.headers {
                     if let existing = responseHeaders[header.name] {
                         responseHeaders[header.name] = existing + ", " + header.value
