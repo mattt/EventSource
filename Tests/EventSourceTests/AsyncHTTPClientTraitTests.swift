@@ -83,15 +83,14 @@
         #if canImport(NIOPosix)
             @Test("AsyncHTTPClient backend executes request and streams bytes")
             func backendExecutionAndStreaming() async throws {
-                let server = try await LocalSSEHTTPServer(
+                try await withLocalSSEHTTPServer(
                     responseBody: "data: hello\n\ndata: world\n\n",
                     headers: [
                         ("Content-Type", "text/event-stream"),
                         ("Set-Cookie", "a=1"),
                         ("Set-Cookie", "b=2"),
                     ]
-                )
-                do {
+                ) { server in
                     var request = URLRequest(url: server.url)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     let backend = AsyncHTTPClientBackend()
@@ -108,11 +107,26 @@
                     }
                     let payload = String(decoding: collected, as: UTF8.self)
                     #expect(payload == "data: hello\n\ndata: world\n\n")
+                }
+            }
+
+            private func withLocalSSEHTTPServer<T>(
+                responseBody: String,
+                headers: [(String, String)],
+                operation: (LocalSSEHTTPServer) async throws -> T
+            ) async throws -> T {
+                let server = try await LocalSSEHTTPServer(
+                    responseBody: responseBody,
+                    headers: headers
+                )
+                do {
+                    let result = try await operation(server)
+                    try? await server.shutdown()
+                    return result
                 } catch {
                     try? await server.shutdown()
                     throw error
                 }
-                try? await server.shutdown()
             }
         #endif
     }
