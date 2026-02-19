@@ -721,9 +721,11 @@ public actor EventSource {
                 parser: Parser
             ) async throws {
                 let backend = AsyncHTTPClientBackend()
+                let timeoutSeconds = max(1.0, session.configuration.timeoutIntervalForResource)
+                let timeoutNanos = Int64(min(timeoutSeconds * 1_000_000_000, Double(Int64.max)))
                 let (response, byteStream) = try await backend.execute(
                     currentRequest,
-                    timeout: asyncHTTPClientTimeout()
+                    timeout: .nanoseconds(timeoutNanos)
                 )
                 try validateHTTPResponse(response)
                 readyState = .open
@@ -731,12 +733,6 @@ public actor EventSource {
                     await onOpen()
                 }
                 try await processIncomingBytes(from: byteStream, parser: parser)
-            }
-
-            private func asyncHTTPClientTimeout() -> TimeAmount {
-                let seconds = max(1.0, session.configuration.timeoutIntervalForResource)
-                let nanos = Int64(min(seconds * 1_000_000_000, Double(Int64.max)))
-                return .nanoseconds(nanos)
             }
         #endif
     #endif
