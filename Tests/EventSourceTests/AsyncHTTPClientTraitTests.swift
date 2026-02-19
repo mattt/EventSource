@@ -91,28 +91,28 @@
                         ("Set-Cookie", "b=2"),
                     ]
                 )
-                defer {
-                    Task {
-                        try? await server.shutdown()
+                do {
+                    var request = URLRequest(url: server.url)
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    let backend = AsyncHTTPClientBackend()
+                    let (response, bytes) = try await backend.execute(request, timeout: .seconds(5))
+
+                    #expect(response.statusCode == 200)
+                    #expect(response.value(forHTTPHeaderField: "Content-Type") == "text/event-stream")
+                    #expect(response.value(forHTTPHeaderField: "Set-Cookie")?.contains("a=1") == true)
+                    #expect(response.value(forHTTPHeaderField: "Set-Cookie")?.contains("b=2") == true)
+
+                    var collected: [UInt8] = []
+                    for try await byte in bytes {
+                        collected.append(byte)
                     }
+                    let payload = String(decoding: collected, as: UTF8.self)
+                    #expect(payload == "data: hello\n\ndata: world\n\n")
+                } catch {
+                    try? await server.shutdown()
+                    throw error
                 }
-
-                var request = URLRequest(url: server.url)
-                request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                let backend = AsyncHTTPClientBackend()
-                let (response, bytes) = try await backend.execute(request, timeout: .seconds(5))
-
-                #expect(response.statusCode == 200)
-                #expect(response.value(forHTTPHeaderField: "Content-Type") == "text/event-stream")
-                #expect(response.value(forHTTPHeaderField: "Set-Cookie")?.contains("a=1") == true)
-                #expect(response.value(forHTTPHeaderField: "Set-Cookie")?.contains("b=2") == true)
-
-                var collected: [UInt8] = []
-                for try await byte in bytes {
-                    collected.append(byte)
-                }
-                let payload = String(decoding: collected, as: UTF8.self)
-                #expect(payload == "data: hello\n\ndata: world\n\n")
+                try? await server.shutdown()
             }
         #endif
     }

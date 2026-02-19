@@ -19,6 +19,16 @@
         )
     }
 
+    actor ShutdownCoordinator {
+        private var hasShutdown = false
+
+        func shutdown(client: HTTPClient) async {
+            guard !hasShutdown else { return }
+            hasShutdown = true
+            try? await client.shutdown()
+        }
+    }
+
     struct AsyncHTTPClientBackend: EventSourceByteStreamingBackend {
         func execute(_ request: URLRequest, timeout: TimeAmount) async throws -> (
             response: HTTPURLResponse, bytes: AsyncThrowingStream<UInt8, Error>
@@ -28,6 +38,7 @@
             }
 
             let client = HTTPClient()
+            let shutdownCoordinator = ShutdownCoordinator()
             var clientRequest = HTTPClientRequest(url: url.absoluteString)
 
             if let method = request.httpMethod {
@@ -76,19 +87,19 @@
                         } catch {
                             continuation.finish(throwing: error)
                         }
-                        try? await client.shutdown()
+                        await shutdownCoordinator.shutdown(client: client)
                     }
                     continuation.onTermination = { _ in
                         task.cancel()
                         Task {
-                            try? await client.shutdown()
+                            await shutdownCoordinator.shutdown(client: client)
                         }
                     }
                 }
 
                 return (httpResponse, bytes)
             } catch {
-                try? await client.shutdown()
+                await shutdownCoordinator.shutdown(client: client)
                 throw error
             }
         }
