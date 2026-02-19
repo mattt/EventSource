@@ -570,6 +570,8 @@ public actor EventSource {
                                 )
                             } catch {
                                 if shouldFallbackToAsyncHTTPClient(for: error) {
+                                    // Once this instance falls back to AsyncHTTPClient on Linux,
+                                    // subsequent reconnect attempts continue using it.
                                     useAsyncHTTPClientOnLinux = true
                                     try await connectUsingAsyncHTTPClient(
                                         request: currentRequest,
@@ -719,13 +721,22 @@ public actor EventSource {
                 parser: Parser
             ) async throws {
                 let backend = AsyncHTTPClientBackend()
-                let (response, byteStream) = try await backend.execute(currentRequest)
+                let (response, byteStream) = try await backend.execute(
+                    currentRequest,
+                    timeout: asyncHTTPClientTimeout()
+                )
                 try validateHTTPResponse(response)
                 readyState = .open
                 if let onOpen = _onOpenCallback {
                     await onOpen()
                 }
                 try await processIncomingBytes(from: byteStream, parser: parser)
+            }
+
+            private func asyncHTTPClientTimeout() -> TimeAmount {
+                let seconds = max(1.0, session.configuration.timeoutIntervalForResource)
+                let nanos = Int64(min(seconds * 1_000_000_000, Double(Int64.max)))
+                return .nanoseconds(nanos)
             }
         #endif
     #endif

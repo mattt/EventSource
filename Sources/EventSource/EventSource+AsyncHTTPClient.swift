@@ -1,6 +1,7 @@
 #if canImport(AsyncHTTPClient)
     import AsyncHTTPClient
     import Foundation
+    import NIOCore
     import NIOHTTP1
 
     #if canImport(FoundationNetworking)
@@ -13,13 +14,13 @@
     }
 
     protocol EventSourceByteStreamingBackend: Sendable {
-        func execute(_ request: URLRequest) async throws -> (
+        func execute(_ request: URLRequest, timeout: TimeAmount) async throws -> (
             response: HTTPURLResponse, bytes: AsyncThrowingStream<UInt8, Error>
         )
     }
 
     struct AsyncHTTPClientBackend: EventSourceByteStreamingBackend {
-        func execute(_ request: URLRequest) async throws -> (
+        func execute(_ request: URLRequest, timeout: TimeAmount) async throws -> (
             response: HTTPURLResponse, bytes: AsyncThrowingStream<UInt8, Error>
         ) {
             guard let url = request.url else {
@@ -41,39 +42,55 @@
                 clientRequest.body = .bytes(body)
             }
 
-            let response = try await client.execute(clientRequest, timeout: .seconds(300))
-            let responseHeaders = Dictionary(
-                uniqueKeysWithValues: response.headers.map { ($0.name, $0.value) }
-            )
-            guard
-                let httpResponse = HTTPURLResponse(
-                    url: url,
-                    statusCode: Int(response.status.code),
-                    httpVersion: nil,
-                    headerFields: responseHeaders
-                )
-            else {
-                throw EventSourceAsyncHTTPClientError.invalidResponse
-            }
-
-            let bytes = AsyncThrowingStream<UInt8, Error> { continuation in
-                let task = Task {
-                    do {
-                        for try await chunk in response.body {
-                            for byte in chunk.readableBytesView {
-                                continuation.yield(byte)
-                            }
-                        }
-                        continuation.finish()
-                    } catch {
-                        continuation.finish(throwing: error)
+            do {
+                let response = try await client.execute(clientRequest, timeout: timeout)
+                var responseHeaders: [String: String] = [:]
+                for header in response.headers {
+                    if let existing = responseHeaders[header.name] {
+                        responseHeaders[header.name] = existing + ", " + header.value
+                    } else {
+                        responseHeaders[header.name] = header.value
                     }
-                    try? await client.shutdown()
                 }
-                continuation.onTermination = { _ in task.cancel() }
-            }
 
-            return (httpResponse, bytes)
+                guard
+                    let httpResponse = HTTPURLResponse(
+                        url: url,
+                        statusCode: Int(response.status.code),
+                        httpVersion: nil,
+                        headerFields: responseHeaders
+                    )
+                else {
+                    throw EventSourceAsyncHTTPClientError.invalidResponse
+                }
+
+                let bytes = AsyncThrowingStream<UInt8, Error> { continuation in
+                    let task = Task {
+                        do {
+                            for try await chunk in response.body {
+                                for byte in chunk.readableBytesView {
+                                    continuation.yield(byte)
+                                }
+                            }
+                            continuation.finish()
+                        } catch {
+                            continuation.finish(throwing: error)
+                        }
+                        try? await client.shutdown()
+                    }
+                    continuation.onTermination = { _ in
+                        task.cancel()
+                        Task {
+                            try? await client.shutdown()
+                        }
+                    }
+                }
+
+                return (httpResponse, bytes)
+            } catch {
+                try? await client.shutdown()
+                throw error
+            }
         }
     }
 
@@ -90,7 +107,7 @@
                 ]
                 return !nonRetryableCodes.contains(urlError.code)
             }
-            return true
+            return false
         }
     }
 

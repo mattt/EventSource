@@ -51,6 +51,14 @@ swift build --traits AsyncHTTPClient
 swift test --traits AsyncHTTPClient
 ```
 
+> [!NOTE]
+> `AsyncHTTPClient` uses SwiftNIO instead of Foundation URL Loading System.
+> If traffic is routed through `AsyncHTTPClient`, `URLProtocol`-based interception
+> does not apply.
+> On Linux, EventSource starts with URLSession transport and switches to
+> AsyncHTTPClient only after a retryable URLSession failure. Once switched,
+> that EventSource instance continues using AsyncHTTPClient for reconnect attempts.
+
 ## Usage
 
 ### Connecting to an EventSource
