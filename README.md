@@ -28,6 +28,37 @@ dependencies: [
 ]
 ```
 
+### AsyncHTTPClient support
+
+EventSource can optionally integrate with
+[AsyncHTTPClient](https://github.com/swift-server/async-http-client)
+through a package trait (Swift 6.1+):
+
+```swift
+dependencies: [
+    .package(
+        url: "https://github.com/mattt/EventSource.git",
+        from: "1.4.0",
+        traits: ["AsyncHTTPClient"]
+    )
+]
+```
+
+Build and test with the trait enabled:
+
+```bash
+swift build --traits AsyncHTTPClient
+swift test --traits AsyncHTTPClient
+```
+
+> [!NOTE]
+> `AsyncHTTPClient` uses SwiftNIO instead of Foundation URL Loading System.
+> If traffic is routed through `AsyncHTTPClient`, `URLProtocol`-based interception
+> does not apply.
+> On Linux, EventSource starts with URLSession transport and switches to
+> AsyncHTTPClient only after a retryable URLSession failure. Once switched,
+> that EventSource instance continues using AsyncHTTPClient for reconnect attempts.
+
 ## Usage
 
 ### Connecting to an EventSource

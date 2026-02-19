@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-macos:
-    name: Swift ${{ matrix.swift }} on macOS ${{ matrix.macos }} with Xcode ${{ matrix.xcode }}
+    name: Swift ${{ matrix.swift }} on macOS ${{ matrix.macos }} with Xcode ${{ matrix.xcode }}${{ matrix.variant == 'async_http_client' && ' (AsyncHTTPClient)' || '' }}
     runs-on: macos-${{ matrix.macos }}
     env:
       DEVELOPER_DIR: "/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer"
@@ -19,12 +19,23 @@ jobs:
           - macos: "15"
             swift: "6.0"
             xcode: "16.0"
+            variant: default
           - macos: "15"
             swift: "6.1"
             xcode: "16.3"
+            variant: default
           - macos: "26"
             swift: "6.2"
             xcode: "26.0"
+            variant: default
+          - macos: "15"
+            swift: "6.1"
+            xcode: "16.3"
+            variant: async_http_client
+          - macos: "26"
+            swift: "6.2"
+            xcode: "26.0"
+            variant: async_http_client
     timeout-minutes: 5
     steps:
       - name: Checkout code
@@ -36,27 +47,40 @@ jobs:
           path: |
             ~/.cache/org.swift.swiftpm
             .build
-          key: ${{ runner.os }}-swift-${{ matrix.swift }}-spm-${{ hashFiles('**/Package.resolved') }}
+          key: ${{ runner.os }}-swift-${{ matrix.swift }}-${{ matrix.variant }}-spm-${{ hashFiles('**/Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-swift-${{ matrix.swift }}-spm-
+            ${{ runner.os }}-swift-${{ matrix.swift }}-${{ matrix.variant }}-spm-
+
+      - name: Configure variant
+        run: |
+          if [ "${{ matrix.variant }}" = "async_http_client" ]; then
+            echo "SWIFT_VARIANT_ARGS=--traits AsyncHTTPClient --scratch-path .build/async-http-client" >> "$GITHUB_ENV"
+          else
+            echo "SWIFT_VARIANT_ARGS=--scratch-path .build/default" >> "$GITHUB_ENV"
+          fi
 
       - name: Lint
         run: swift format lint --recursive . --strict
 
       - name: Build
-        run: swift build -v
+        run: swift build $SWIFT_VARIANT_ARGS
 
       - name: Test
-        run: swift test -v
+        run: swift test $SWIFT_VARIANT_ARGS
 
   test-linux:
-    name: Swift ${{ matrix.swift-version }} on Linux
+    name: Swift ${{ matrix.swift-version }} on Linux${{ matrix.variant == 'async_http_client' && ' (AsyncHTTPClient)' || '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        swift-version:
-          - 6.1.0
+        include:
+          - swift-version: "6.0.3"
+            variant: default
+          - swift-version: "6.1.0"
+            variant: default
+          - swift-version: "6.1.0"
+            variant: async_http_client
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -67,8 +91,16 @@ jobs:
         with:
           toolchain: ${{ matrix.swift-version }}
 
+      - name: Configure variant
+        run: |
+          if [ "${{ matrix.variant }}" = "async_http_client" ]; then
+            echo "SWIFT_VARIANT_ARGS=--traits AsyncHTTPClient --scratch-path .build/async-http-client" >> "$GITHUB_ENV"
+          else
+            echo "SWIFT_VARIANT_ARGS=--scratch-path .build/default" >> "$GITHUB_ENV"
+          fi
+
       - name: Build
-        run: swift build -v
+        run: swift build $SWIFT_VARIANT_ARGS
 
       - name: Test
-        run: swift test -v
+        run: swift test $SWIFT_VARIANT_ARGS

@@ -103,7 +103,7 @@ public enum EventSourceError: Swift.Error, LocalizedError {
                 guard let self else { return }
                 await last?.value
                 await parser.finish()
-                if let e = error { await owner?.emitError(e) }
+                await owner?.setLinuxCompletionError(error)
                 await owner?.resumeLinuxCompletion()
             }
         }
@@ -375,6 +375,11 @@ public actor EventSource {
         private var linuxSession: URLSession?
         private var linuxTask: URLSessionDataTask?
         private var linuxCompletion: CheckedContinuation<Void, Never>?
+        private var linuxCompletionError: Error?
+
+        #if canImport(AsyncHTTPClient)
+            private var useAsyncHTTPClientOnLinux = false
+        #endif
     #endif
 
     /// The callback to invoke when the connection is opened.
@@ -445,7 +450,7 @@ public actor EventSource {
             readyState = .closed
             linuxTask?.cancel()
             linuxSession?.invalidateAndCancel()
-            await resumeLinuxCompletion()
+            resumeLinuxCompletion()
         }
 
         fileprivate func waitForLinuxCompletion() async {
@@ -457,6 +462,16 @@ public actor EventSource {
         fileprivate func resumeLinuxCompletion() {
             linuxCompletion?.resume()
             linuxCompletion = nil
+        }
+
+        fileprivate func setLinuxCompletionError(_ error: Error?) {
+            linuxCompletionError = error
+        }
+
+        fileprivate func consumeLinuxCompletionError() -> Error? {
+            let error = linuxCompletionError
+            linuxCompletionError = nil
+            return error
         }
     #endif
 
@@ -541,22 +556,38 @@ public actor EventSource {
 
                 // Perform the HTTP request with streaming support
                 #if canImport(FoundationNetworking)
-                    // Linux: Use URLSessionDataTask with delegate for streaming
-                    let delegate = LinuxSSEDelegate(owner: self, parser: parser)
-                    let delegateQueue = OperationQueue()
-                    delegateQueue.maxConcurrentOperationCount = 1
-                    let linuxSession = URLSession(
-                        configuration: session.configuration,
-                        delegate: delegate,
-                        delegateQueue: delegateQueue
-                    )
-                    self.linuxSession = linuxSession
-                    let task = linuxSession.dataTask(with: currentRequest)
-                    self.linuxTask = task
-                    task.resume()
-
-                    // Wait until the stream completes (server closed or error)
-                    await waitForLinuxCompletion()
+                    #if canImport(AsyncHTTPClient)
+                        if shouldUseAsyncHTTPClientOnLinux() {
+                            try await connectUsingAsyncHTTPClient(
+                                request: currentRequest,
+                                parser: parser
+                            )
+                        } else {
+                            do {
+                                try await connectUsingLinuxURLSession(
+                                    request: currentRequest,
+                                    parser: parser
+                                )
+                            } catch {
+                                if shouldFallbackToAsyncHTTPClient(for: error) {
+                                    // Once this instance falls back to AsyncHTTPClient on Linux,
+                                    // subsequent reconnect attempts continue using it.
+                                    useAsyncHTTPClientOnLinux = true
+                                    try await connectUsingAsyncHTTPClient(
+                                        request: currentRequest,
+                                        parser: parser
+                                    )
+                                } else {
+                                    throw error
+                                }
+                            }
+                        }
+                    #else
+                        try await connectUsingLinuxURLSession(
+                            request: currentRequest,
+                            parser: parser
+                        )
+                    #endif
                 #else
                     // Apple platforms: Use URLSession.bytes for true streaming
                     let (byteStream, response) = try await session.bytes(
@@ -566,14 +597,7 @@ public actor EventSource {
 
                     // Validate HTTP response (status code and content type).
                     if let httpResponse = response as? HTTPURLResponse {
-                        let status = httpResponse.statusCode
-                        if status != 200 {
-                            throw EventSourceError.invalidHTTPStatus(status)
-                        }
-                        let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")
-                        if contentType?.lowercased().hasPrefix("text/event-stream") != true {
-                            throw EventSourceError.invalidContentType(contentType)
-                        }
+                        try validateHTTPResponse(httpResponse)
                     } else {
                         throw EventSourceError.invalidHTTPStatus(0)
                     }
@@ -585,19 +609,7 @@ public actor EventSource {
                     }
 
                     // Read the incoming byte stream and parse events.
-                    for try await byte in byteStream {
-                        if Task.isCancelled || readyState == .closed {
-                            break
-                        }
-
-                        await parser.consume(byte)
-
-                        while let event = await parser.getNextEvent() {
-                            if let onMessage = _onMessageCallback {
-                                await onMessage(event)
-                            }
-                        }
-                    }
+                    try await processIncomingBytes(from: byteStream, parser: parser)
                 #endif
 
                 // End of stream reached (server closed connection).
@@ -642,6 +654,98 @@ public actor EventSource {
 
         // Update state to `.closed`.
         readyState = .closed
+    }
+
+    private func processIncomingBytes<S: AsyncSequence>(
+        from byteStream: S,
+        parser: Parser
+    ) async throws where S.Element == UInt8 {
+        for try await byte in byteStream {
+            if Task.isCancelled || readyState == .closed {
+                break
+            }
+
+            await parser.consume(byte)
+
+            while let event = await parser.getNextEvent() {
+                if let onMessage = _onMessageCallback {
+                    await onMessage(event)
+                }
+            }
+        }
+    }
+
+    #if canImport(FoundationNetworking)
+        private func connectUsingLinuxURLSession(
+            request currentRequest: URLRequest,
+            parser: Parser
+        ) async throws {
+            let delegate = LinuxSSEDelegate(owner: self, parser: parser)
+            let delegateQueue = OperationQueue()
+            delegateQueue.maxConcurrentOperationCount = 1
+            let linuxSession = URLSession(
+                configuration: session.configuration,
+                delegate: delegate,
+                delegateQueue: delegateQueue
+            )
+            self.linuxSession = linuxSession
+            self.linuxCompletionError = nil
+            let task = linuxSession.dataTask(with: currentRequest)
+            self.linuxTask = task
+            task.resume()
+
+            await waitForLinuxCompletion()
+            if let completionError = consumeLinuxCompletionError() {
+                throw completionError
+            }
+        }
+
+        private func shouldUseAsyncHTTPClientOnLinux() -> Bool {
+            #if canImport(AsyncHTTPClient)
+                return useAsyncHTTPClientOnLinux
+            #else
+                return false
+            #endif
+        }
+
+        #if canImport(AsyncHTTPClient)
+            private func shouldFallbackToAsyncHTTPClient(for error: Error) -> Bool {
+                EventSourceFallbackPolicy.shouldFallback(
+                    useAsyncHTTPClientOnLinux: useAsyncHTTPClientOnLinux,
+                    error: error
+                )
+            }
+
+            private func connectUsingAsyncHTTPClient(
+                request currentRequest: URLRequest,
+                parser: Parser
+            ) async throws {
+                let backend = AsyncHTTPClientBackend()
+                let timeoutSeconds = max(1.0, session.configuration.timeoutIntervalForResource)
+                let timeoutNanos = Int64(min(timeoutSeconds * 1_000_000_000, Double(Int64.max)))
+                let (response, byteStream) = try await backend.execute(
+                    currentRequest,
+                    timeout: .nanoseconds(timeoutNanos)
+                )
+                try validateHTTPResponse(response)
+                readyState = .open
+                if let onOpen = _onOpenCallback {
+                    await onOpen()
+                }
+                try await processIncomingBytes(from: byteStream, parser: parser)
+            }
+        #endif
+    #endif
+
+    private func validateHTTPResponse(_ httpResponse: HTTPURLResponse) throws {
+        let status = httpResponse.statusCode
+        if status != 200 {
+            throw EventSourceError.invalidHTTPStatus(status)
+        }
+        let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")
+        if contentType?.lowercased().hasPrefix("text/event-stream") != true {
+            throw EventSourceError.invalidContentType(contentType)
+        }
     }
 }
 

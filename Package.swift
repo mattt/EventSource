@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -20,15 +20,35 @@ let package = Package(
             targets: ["EventSource"]
         )
     ],
+    traits: [
+        .trait(name: "AsyncHTTPClient")
+    ],
+    dependencies: [
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.24.0")
+    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "EventSource"
+            name: "EventSource",
+            dependencies: [
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["AsyncHTTPClient"])
+                )
+            ]
         ),
         .testTarget(
             name: "EventSourceTests",
-            dependencies: ["EventSource"]
+            dependencies: [
+                "EventSource",
+                .product(
+                    name: "AsyncHTTPClient",
+                    package: "async-http-client",
+                    condition: .when(traits: ["AsyncHTTPClient"])
+                ),
+            ]
         ),
     ]
 )
