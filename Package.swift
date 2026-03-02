@@ -24,7 +24,8 @@ let package = Package(
         .trait(name: "AsyncHTTPClient")
     ],
     dependencies: [
-        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.24.0")
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.24.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -36,7 +37,8 @@ let package = Package(
                     name: "AsyncHTTPClient",
                     package: "async-http-client",
                     condition: .when(traits: ["AsyncHTTPClient"])
-                )
+                ),
+                .product(name: "NIOCore", package: "swift-nio"),
             ]
         ),
         .testTarget(
