@@ -1,4 +1,4 @@
-#if canImport(AsyncHTTPClient)
+#if AsyncHTTPClient
     import AsyncHTTPClient
     import Foundation
     import NIOCore
