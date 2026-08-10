@@ -377,7 +377,7 @@ public actor EventSource {
         private var linuxCompletion: CheckedContinuation<Void, Never>?
         private var linuxCompletionError: Error?
 
-        #if canImport(AsyncHTTPClient)
+        #if AsyncHTTPClient
             private var useAsyncHTTPClientOnLinux = false
         #endif
     #endif
@@ -556,7 +556,7 @@ public actor EventSource {
 
                 // Perform the HTTP request with streaming support
                 #if canImport(FoundationNetworking)
-                    #if canImport(AsyncHTTPClient)
+                    #if AsyncHTTPClient
                         if shouldUseAsyncHTTPClientOnLinux() {
                             try await connectUsingAsyncHTTPClient(
                                 request: currentRequest,
@@ -701,14 +701,14 @@ public actor EventSource {
         }
 
         private func shouldUseAsyncHTTPClientOnLinux() -> Bool {
-            #if canImport(AsyncHTTPClient)
+            #if AsyncHTTPClient
                 return useAsyncHTTPClientOnLinux
             #else
                 return false
             #endif
         }
 
-        #if canImport(AsyncHTTPClient)
+        #if AsyncHTTPClient
             private func shouldFallbackToAsyncHTTPClient(for error: Error) -> Bool {
                 EventSourceFallbackPolicy.shouldFallback(
                     useAsyncHTTPClientOnLinux: useAsyncHTTPClientOnLinux,
