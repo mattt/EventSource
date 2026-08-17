@@ -37,8 +37,12 @@ actor RequestHandlerStorage {
 
 // MARK: - Mock URL Protocol
 
+private struct UncheckedSendable<Value>: @unchecked Sendable {
+    let value: Value
+}
+
 /// Custom URLProtocol for testing network requests
-final class MockURLProtocol: URLProtocol, @unchecked Sendable {
+final class MockURLProtocol: URLProtocol {
     /// Storage for request handlers
     static let requestHandlerStorage = RequestHandlerStorage()
 
@@ -63,14 +67,21 @@ final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func startLoading() {
+        let request = self.request
+        let boxed = UncheckedSendable(value: self)
         Task {
+            let urlProtocol = boxed.value
             do {
-                let (response, data) = try await self.executeHandler(for: request)
-                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: data)
-                client?.urlProtocolDidFinishLoading(self)
+                let (response, data) = try await urlProtocol.executeHandler(for: request)
+                urlProtocol.client?.urlProtocol(
+                    urlProtocol,
+                    didReceive: response,
+                    cacheStoragePolicy: .notAllowed
+                )
+                urlProtocol.client?.urlProtocol(urlProtocol, didLoad: data)
+                urlProtocol.client?.urlProtocolDidFinishLoading(urlProtocol)
             } catch {
-                client?.urlProtocol(self, didFailWithError: error)
+                urlProtocol.client?.urlProtocol(urlProtocol, didFailWithError: error)
             }
         }
     }
