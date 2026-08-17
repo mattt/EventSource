@@ -22,19 +22,27 @@ jobs:
             variant: default
           - macos: "15"
             swift: "6.1"
-            xcode: "16.3"
+            xcode: "16.4"
             variant: default
           - macos: "26"
             swift: "6.2"
-            xcode: "26.0"
+            xcode: "26.3"
+            variant: default
+          - macos: "26"
+            swift: "6.3"
+            xcode: "26.6"
             variant: default
           - macos: "15"
             swift: "6.1"
-            xcode: "16.3"
+            xcode: "16.4"
             variant: async_http_client
           - macos: "26"
             swift: "6.2"
-            xcode: "26.0"
+            xcode: "26.3"
+            variant: async_http_client
+          - macos: "26"
+            swift: "6.3"
+            xcode: "26.6"
             variant: async_http_client
     timeout-minutes: 5
     steps:
@@ -77,9 +85,17 @@ jobs:
         include:
           - swift-version: "6.0.3"
             variant: default
-          - swift-version: "6.1.0"
+          - swift-version: "6.1.3"
             variant: default
-          - swift-version: "6.1.0"
+          - swift-version: "6.2.4"
+            variant: default
+          - swift-version: "6.3.3"
+            variant: default
+          - swift-version: "6.1.3"
+            variant: async_http_client
+          - swift-version: "6.2.4"
+            variant: async_http_client
+          - swift-version: "6.3.3"
             variant: async_http_client
     timeout-minutes: 10
     steps:
