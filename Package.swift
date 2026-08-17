@@ -38,7 +38,11 @@ let package = Package(
                     package: "async-http-client",
                     condition: .when(traits: ["AsyncHTTPClient"])
                 ),
-                .product(name: "NIOCore", package: "swift-nio"),
+                .product(
+                    name: "NIOCore",
+                    package: "swift-nio",
+                    condition: .when(traits: ["AsyncHTTPClient"])
+                ),
             ]
         ),
         .testTarget(
