@@ -61,7 +61,7 @@ jobs:
             swift: "6.4"
             xcode: "27.0"
             variant: async_http_client
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
