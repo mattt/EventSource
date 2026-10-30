@@ -95,7 +95,7 @@ jobs:
 
   test-linux:
     name: Swift ${{ matrix.swift-version }} on Linux${{ matrix.variant == 'async_http_client' && ' (AsyncHTTPClient)' || '' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -141,3 +141,31 @@ jobs:
 
       - name: Test
         run: swift test $SWIFT_VARIANT_ARGS
+
+  build-wasi:
+    name: Swift ${{ matrix.swift-version }} for WASI
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - swift-version: "6.4.1"
+            wasm-sdk-checksum: "783e6128d174d9f975b4eda68be02a5960681b723ef372e6876a7c2543a365d8"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Swift
+        uses: vapor/swiftly-action@v0.2
+        with:
+          toolchain: ${{ matrix.swift-version }}
+
+      - name: Install Swift SDK for WASI
+        run: |
+          swift sdk install \
+            "https://download.swift.org/swift-${{ matrix.swift-version }}-release/wasm-sdk/swift-${{ matrix.swift-version }}-RELEASE/swift-${{ matrix.swift-version }}-RELEASE_wasm.artifactbundle.tar.gz" \
+            --checksum "${{ matrix.wasm-sdk-checksum }}"
+
+      - name: Build
+        run: swift build --swift-sdk "swift-${{ matrix.swift-version }}-RELEASE_wasm"

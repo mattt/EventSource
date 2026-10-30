@@ -10,7 +10,7 @@ A lightweight, spec-compliant Server-Sent Events (SSE) client for Swift.
 - [x] Support for different line break formats (`LF`, `CR`, `CRLF`)
 - [x] Multi-line data aggregation
 - [x] `AsyncSequence` support for streaming events
-- [x] Works on all Apple platforms and Linux
+- [x] Works on all Apple platforms and Linux, with event parsing on WASI
 
 ## Requirements
 
@@ -58,6 +58,12 @@ swift test --traits AsyncHTTPClient
 > On Linux, EventSource starts with URLSession transport and switches to
 > AsyncHTTPClient only after a retryable URLSession failure. Once switched,
 > that EventSource instance continues using AsyncHTTPClient for reconnect attempts.
+
+### WASI support
+
+WASI doesn’t support sockets, so Foundation doesn’t have URLSession, URLRequest, or HTTPURLResponse, and EventSource’s AsyncHTTPClient trait isn’t supported. WASI doesn’t have a URL-loading system either, so `EventSource` cannot open connections.
+
+Instead, fetch bytes with your own runtime's networking stack, and parse them using `AsyncSequence.events` or directly with `EventSource.Parser`. (For more information see [Parsing Server-Sent Events Directly](#parsing-server-sent-events-directly).)
 
 ## Usage
 
