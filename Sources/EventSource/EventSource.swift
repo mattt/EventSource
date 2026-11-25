@@ -252,7 +252,7 @@ public actor EventSource {
                 currentEventType = fieldValue
                 seenFields.insert("event")
             case "data":
-                if !currentData.isEmpty {
+                if fieldSeen("data") {
                     currentData.append("\n")
                 }
                 currentData.append(fieldValue)
