@@ -155,6 +155,17 @@ struct AsyncEventsSequenceTests {
             #expect(event?.data == "line1\nline2\nline3")
         }
 
+        @Test("Leading empty data lines survive chunked delivery", arguments: ["\n", "\r", "\r\n"])
+        func leadingEmptyDataLines(lineEnding: String) async throws {
+            let stream = ["data:", "data:", "data: 🌍", "", ""].joined(separator: lineEnding)
+            let chunks = stream.utf8.map { [$0] }
+            var iterator = ChunkedAsyncBytes(chunks).events.makeAsyncIterator()
+
+            let event = try await iterator.next()
+            #expect(event?.data == "\n\n🌍")
+            #expect(try await iterator.next() == nil)
+        }
+
         @Test("Empty data line")
         func emptyDataLine() async throws {
             // The SSE spec states that if there's a data: field with no value,
